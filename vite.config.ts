@@ -7,16 +7,16 @@ export default defineConfig({
   plugins: [react(), dts()],
 
   server: {
-    port: 3000,
+    port: 3456,
     strictPort: true,
   },
   build: {
     lib: {
       entry: "src/herre/index.tsx",
-      name: "Fakts",
+      name: "herre",
     },
     rollupOptions: {
-      external: ["react", "react-dom"],
+      external: ["react", "react-dom", "cancelable-promise"],
       output: {
         globals: {
           react: "React",

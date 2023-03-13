@@ -643,6 +643,16 @@ call-bind@^1.0.0:
     function-bind "^1.1.1"
     get-intrinsic "^1.0.2"
 
+cancelable-promise@^4.3.1:
+  version "4.3.1"
+  resolved "https://registry.yarnpkg.com/cancelable-promise/-/cancelable-promise-4.3.1.tgz#957b62382435e74dfb2a038517f53205e0c631c6"
+  integrity sha512-A/8PwLk/T7IJDfUdQ68NR24QHa8rIlnN/stiJEBo6dmVUkD4K14LswG0w3VwdeK/o7qOwRUR1k2MhK5Rpy2m7A==
+
+cancellablepromise@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/cancellablepromise/-/cancellablepromise-1.0.1.tgz#d37c075d4a1ebb771e2258e53dd2d4c617b93b44"
+  integrity sha512-dm1MYUCuwWIbO/Vu8URnQNvhEYNkaW45iJOCZ6qYSb5vUEW3fRXozkk2gpEpZX0E+5G26UkkESd9Ab8KE5zMIA==
+
 caniuse-lite@^1.0.30001400:
   version "1.0.30001414"
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001414.tgz#5f1715e506e71860b4b07c50060ea6462217611e"

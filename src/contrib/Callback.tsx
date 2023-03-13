@@ -15,6 +15,7 @@ export const Callback: React.FC<CallbackProps> = (props) => {
     console.log(code);
     if (code) {
       setCode(code);
+      window.close();
     }
   }, []);
 

@@ -4,16 +4,18 @@ import {
   HerreEndpoint,
   HerreGrant,
   HerreUser,
+  Token,
   TokenRequestBody,
 } from "./types";
 import { createPKCECodes, PKCECodePair, toUrlEncoded } from "./utils";
-
+import { CancelablePromise } from "cancelable-promise";
 export type WrappedHerreProps = {
   children?: React.ReactNode;
 };
 
 export type HerreProps = {
   children: React.ReactNode;
+  grantType?: string;
   doRedirect?: (url: string) => void;
 };
 
@@ -23,10 +25,17 @@ export type Auth = {
   refresh_token: string;
 };
 
-export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
+export const HerreProvider = ({
+  doRedirect,
+  children,
+  grantType = "authorization_code",
+}: HerreProps) => {
   const [refresh_token, setRefreshToken] = useState<string | undefined>();
   const [staging_token, setStagingToken] = useState<string | undefined>();
-  const [code, setCode] = useState<string | undefined>();
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
+  const [loginFuture, setLoginFuture] = useState<
+    CancelablePromise<Token> | undefined
+  >();
 
   // Context state
   const [user, setUser] = useState<HerreUser | undefined>();
@@ -80,6 +89,10 @@ export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
     }
   };
 
+  const setCode = async (code: string) => {
+    localStorage.setItem("herre-code", code);
+  };
+
   useEffect(() => {
     const auth = getAuth();
     if (auth) {
@@ -94,8 +107,6 @@ export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
     code: string,
     isRefresh = false
   ) => {
-    const grantType = "authorization_code";
-
     let payload: TokenRequestBody = {
       clientId: grant.clientId.trim(),
       clientSecret: grant.clientSecret || grant.clientSecret?.trim(),
@@ -138,24 +149,6 @@ export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
     console.log(json);
     return json;
   };
-
-  useEffect(() => {
-    if (code) {
-      try {
-        let endpoint = getStoredEndpoint();
-        let grant = getStoredGrant();
-
-        console.log("Code changed, challenging server");
-        fetchToken(grant, endpoint, code).then((token) => {
-          localStorage.setItem("auth", token);
-          setStagingToken(token.access_token);
-          setRefreshToken(token.refresh_token);
-        });
-      } catch (e) {
-        console.log(e);
-      }
-    }
-  }, [code]);
 
   useEffect(() => {
     if (staging_token) {
@@ -217,6 +210,7 @@ export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
 
   const login = (grant?: HerreGrant, endpoint?: HerreEndpoint) => {
     console.log("Logging in");
+    localStorage.setItem("herre-code", "");
 
     let used_grant = grant;
     let used_endpoint = endpoint;
@@ -258,8 +252,62 @@ export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
     if (doRedirect != undefined) {
       doRedirect(url);
     } else {
-      window.location.replace(url);
+      window.open(url, "_blank", "noreferrer, popup");
     }
+
+    setIsAuthenticating(true);
+    const loginFuture = new CancelablePromise(
+      async (resolve, reject, onCancel) => {
+        let count = 0;
+
+        const interval = setInterval(async () => {
+          console.log("Checking for code change");
+          const code = localStorage.getItem("herre-code");
+          if (count > 10) {
+            console.log("Code not changed, cancelling");
+            setIsAuthenticating(false);
+            clearInterval(interval);
+            reject("Code not changed");
+            return;
+          }
+
+          if (code && code.length > 0) {
+            count += 1;
+            console.log("Retrieved code", code);
+            setIsAuthenticating(false);
+            clearInterval(interval);
+            localStorage.removeItem("herre-code");
+
+            try {
+              let endpoint = getStoredEndpoint();
+              let grant = getStoredGrant();
+
+              console.log("Code changed, challenging server");
+              fetchToken(grant, endpoint, code).then((token) => {
+                localStorage.setItem("auth", token);
+
+                resolve(token);
+                setStagingToken(token.access_token);
+                setRefreshToken(token.refresh_token);
+                return;
+              });
+            } catch (e) {
+              reject(e);
+              return;
+            }
+          }
+        }, 500);
+
+        onCancel(() => {
+          setIsAuthenticating(false);
+          console.log("Cancelling login");
+          clearInterval(interval);
+        });
+      }
+    );
+    setLoginFuture(loginFuture);
+
+    return loginFuture;
   };
 
   return (
@@ -270,6 +318,7 @@ export const HerreProvider = ({ doRedirect, children }: HerreProps) => {
         setCode: setCode,
         user: user,
         token: access_token,
+        isAuthenticating,
       }}
     >
       {children}

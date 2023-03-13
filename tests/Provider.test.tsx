@@ -19,14 +19,7 @@ describe("Fakts Provider test", () => {
 describe("Fakts Provider test", () => {
   test("Should be initialized", () => {
     render(
-      <HerreProvider
-        clientId="fff"
-        clientSecret="soinsoin"
-        tokenUrl="oin"
-        authUrl="ff"
-        userInfoUrl="ff"
-        redirectUri="sss"
-      >
+      <HerreProvider>
         <h4>Content</h4>
       </HerreProvider>
     );
