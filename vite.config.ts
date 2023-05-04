@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react(), dts()],
 
   server: {
-    port: 3456,
+    port: 3000,
     strictPort: true,
   },
   build: {

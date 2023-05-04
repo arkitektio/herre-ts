@@ -7,17 +7,35 @@ import {
   Token,
   TokenRequestBody,
 } from "./types";
-import { createPKCECodes, PKCECodePair, toUrlEncoded } from "./utils";
+import {
+  createPKCECodes,
+  PKCECodePair,
+  toUrlEncoded,
+} from "./BrowserChallenger";
 import { CancelablePromise } from "cancelable-promise";
 export type WrappedHerreProps = {
   children?: React.ReactNode;
 };
 
+export type Code = string;
+
 export type HerreProps = {
   children: React.ReactNode;
   grantType?: string;
-  doRedirect?: (url: string) => void;
+  doRedirect?: (url: string, abortController: AbortController) => Promise<Code>;
+  storageProvider?: StorageProvider;
+  codeProvider?: () => Promise<PKCECodePair>;
 };
+
+export type LoginState = {
+  grant: HerreGrant;
+  endpoint: HerreEndpoint;
+  auth: Auth;
+  user: HerreUser;
+};
+
+export const CODE_STRING = "herre-code";
+export const LOGIN_STATE = "herre-login-state";
 
 export type Auth = {
   access_token: string;
@@ -25,87 +43,87 @@ export type Auth = {
   refresh_token: string;
 };
 
+export type StorageProvider = {
+  set(key: string, value: string): Promise<void>;
+  get(key: string): Promise<string | null>;
+  remove(key: string): Promise<void>;
+  codeProvider?: () => PKCECodePair;
+};
+
+export const localStorageProvider = {
+  set: async (key: string, value: string) => {
+    localStorage.setItem(key, value);
+  },
+  get: async (key: string) => {
+    return localStorage.getItem(key);
+  },
+  remove: async (key: string) => {
+    localStorage.removeItem(key);
+  },
+};
+
+export const windowRedirect = (
+  url: string,
+  abortController: AbortController
+) => {
+  localStorage.setItem(CODE_STRING, "");
+  window.open(url, "_blank", "noreferrer, popup");
+  let count = 0;
+  return new Promise<Code>((resolve, reject) => {
+    const interval = setInterval(async () => {
+      count += 1;
+      const code = (await localStorage.getItem(CODE_STRING)) as Code;
+
+      if (count > 100 || abortController.signal.aborted) {
+        console.log("Code not changed, cancelling");
+        clearInterval(interval);
+        reject("Login timed out");
+        return;
+      }
+
+      if (code && code.length > 0) {
+        clearInterval(interval);
+        console.log("Code changed, resolving", code);
+        resolve(code);
+      }
+    }, 500);
+  });
+};
+
 export const HerreProvider = ({
-  doRedirect,
   children,
   grantType = "authorization_code",
+  storageProvider = localStorageProvider,
+  doRedirect = windowRedirect,
+  codeProvider = createPKCECodes,
 }: HerreProps) => {
-  const [refresh_token, setRefreshToken] = useState<string | undefined>();
-  const [staging_token, setStagingToken] = useState<string | undefined>();
-  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
-  const [loginFuture, setLoginFuture] = useState<
-    CancelablePromise<Token> | undefined
-  >();
+  const [loginState, setLoginState] = useState<LoginState | undefined>();
 
-  // Context state
-  const [user, setUser] = useState<HerreUser | undefined>();
-  const [access_token, setAccessToken] = useState<string | undefined>();
-
-  const getPkce = () => {
-    const pkce = localStorage.getItem("pkce");
-    if (null === pkce) {
-      throw new Error("PKCE pair not found in local storage");
+  const persistLoginState = async (loginState: LoginState | undefined) => {
+    if (!loginState) {
+      await storageProvider.remove(LOGIN_STATE);
     } else {
-      return JSON.parse(pkce) as PKCECodePair;
+      await storageProvider.set(LOGIN_STATE, JSON.stringify(loginState));
     }
   };
 
-  const getStoredGrant = () => {
-    const grant_string = localStorage.getItem("herre-grant");
-    if (null === grant_string) {
-      throw new Error("Grant not found in local storage.");
-    } else {
-      return JSON.parse(grant_string) as HerreGrant;
-    }
-  };
-
-  const getStoredEndpoint = () => {
-    const endpoint_string = localStorage.getItem("herre-endpoint");
-    if (null === endpoint_string) {
-      throw new Error("Endpoint not found in local storage.");
-    } else {
-      return JSON.parse(endpoint_string) as HerreEndpoint;
-    }
-  };
-
-  const storeGrant = (grant: HerreGrant) => {
-    localStorage.setItem("herre-grant", JSON.stringify(grant));
-  };
-
-  const storeEndpoint = (endpoint: HerreEndpoint) => {
-    localStorage.setItem("herre-endpoint", JSON.stringify(endpoint));
-  };
-
-  const getAuth = () => {
-    const auth = localStorage.getItem("auth");
-    if (!auth) {
+  const retrieveLoginState = async () => {
+    const loginstate = await storageProvider.get(LOGIN_STATE);
+    if (!loginstate) {
       return undefined;
     } else {
       try {
-        return JSON.parse(auth) as Auth;
+        return JSON.parse(loginstate) as LoginState;
       } catch (e) {
         return undefined;
       }
     }
   };
 
-  const setCode = async (code: string) => {
-    localStorage.setItem("herre-code", code);
-  };
-
-  useEffect(() => {
-    const auth = getAuth();
-    if (auth) {
-      setStagingToken(auth.access_token);
-      setRefreshToken(auth.refresh_token);
-    }
-  }, []);
-
-  const fetchToken = async (
+  const refreshToken = async (
     grant: HerreGrant,
     endpoint: HerreEndpoint,
-    code: string,
-    isRefresh = false
+    token: Auth
   ) => {
     let payload: TokenRequestBody = {
       clientId: grant.clientId.trim(),
@@ -115,25 +133,107 @@ export const HerreProvider = ({
     };
     console.log(payload);
 
-    if (isRefresh) {
-      payload = {
-        ...payload,
-        grantType: "refresh_token",
-        refresh_token: code,
-      };
-    } else {
-      const pkce: PKCECodePair = getPkce();
-      const codeVerifier = pkce.codeVerifier;
-      payload = {
-        ...payload,
-        code,
-        codeVerifier,
-      };
-    }
+    payload = {
+      ...payload,
+      grantType: "refresh_token",
+      refresh_token: token.refresh_token,
+    };
 
     let tokenUrl = endpoint.tokenUrl || endpoint.base_url + "/token";
 
+    const response = await fetch(`${tokenUrl}`, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      method: "POST",
+      body: toUrlEncoded(payload),
+    });
+
+    const json = await response.json();
+    return json;
+  };
+
+  const fetchUserWithToken = async (endpoint: HerreEndpoint, auth: Auth) => {
+    const userInfoUrl =
+      endpoint.userInfoEndpoint || endpoint.base_url + "/userinfo";
+    console.log(`Fetching user from ${userInfoUrl}`);
+    const response = await fetch(`${userInfoUrl}`, {
+      headers: {
+        Authorization: `Bearer ${auth.access_token}`,
+      },
+
+      method: "GET",
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    if (data.sub) {
+      return data as HerreUser;
+    }
+
+    throw new Error("No user found");
+  };
+
+  useEffect(() => {
+    retrieveLoginState().then(async (persistedState) => {
+      // cheking if loginstate still valid
+      if (persistedState) {
+        const { grant, endpoint, auth } = persistedState || {};
+        try {
+          let user = await fetchUserWithToken(endpoint, auth);
+          setLoginState({ ...persistedState, user: user });
+        } catch (e) {
+          // Lets try to refresh the token
+          const new_auth = await refreshToken(grant, endpoint, auth);
+          setLoginState({ ...persistedState, auth: new_auth });
+        }
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    // Autopersist
+    persistLoginState(loginState);
+  }, [loginState]);
+
+  const logout = async () => {
+    console.log("Logging Out");
+    setLoginState(undefined);
+  };
+
+  const refresh = async () => {
+    if (loginState) {
+      const { grant, endpoint, auth } = loginState || {};
+      const new_auth = await refreshToken(grant, endpoint, auth);
+      setLoginState({ ...loginState, auth: new_auth });
+      return new_auth.access_token;
+    }
+    throw new Error("Never Login. Please Login Again!");
+  };
+
+  const challengeCode = async (
+    endpoint: HerreEndpoint,
+    grant: HerreGrant,
+    pkce: PKCECodePair,
+    code: string
+  ) => {
+    // We use the stored grant and endpoint here, because the
+
+    console.log("Code changed, challenging server");
+    let payload: TokenRequestBody = {
+      clientId: grant.clientId.trim(),
+      clientSecret: grant.clientSecret || grant.clientSecret?.trim(),
+      redirectUri: grant.redirectUri,
+      grantType,
+      code,
+      codeVerifier: pkce.codeVerifier,
+    };
     console.log(payload);
+
+    let tokenUrl = endpoint.tokenUrl || endpoint.base_url + "/token";
+
     const response = await fetch(`${tokenUrl}`, {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -141,184 +241,88 @@ export const HerreProvider = ({
       method: "POST",
       body: toUrlEncoded(payload),
     }).catch((e) => {
-      console.log({ e });
       throw e;
     });
 
-    const json = await response.json();
-    console.log(json);
-    return json;
+    const token = await response.json();
+    if (token.error) {
+      throw new Error(token.error);
+    }
+    console.log("Token", token);
+    return token as Auth;
   };
 
-  useEffect(() => {
-    if (staging_token) {
-      try {
-        let endpoint = getStoredEndpoint();
-        let userInfoUrl =
-          endpoint.userInfoEndpoint || endpoint.base_url + "/userinfo";
-        console.log(`Fetching user from ${userInfoUrl}`);
-        fetch(`${userInfoUrl}`, {
-          headers: {
-            Authorization: `Bearer ${staging_token}`,
-          },
-          method: "GET",
-        }).then(
-          (result) => {
-            if (result) {
-              result.json().then((data) => {
-                console.log(data);
-                if (data.error) {
-                  logout();
-                }
-                if (data.sub) {
-                  setUser(data);
-                  setAccessToken(staging_token);
-                  localStorage.setItem(
-                    "auth",
-                    JSON.stringify({
-                      access_token: staging_token,
-                      refresh_token: refresh_token,
-                    })
-                  );
-                  let path = localStorage.getItem("preAuthUri");
-                  if (path) {
-                    localStorage.removeItem("preAuthUri");
-                  }
-                }
-              });
-            } else {
-              console.log("Didnt receive an Associated User", result);
-            }
-          },
-          (error) => {
-            console.error(error);
-            logout();
-          }
-        );
-      } catch (e) {
-        console.log(e);
-      }
-    }
-  }, [staging_token]);
-
-  const logout = () => {
-    console.log("Logging Out");
-    localStorage.removeItem("auth");
-    setUser(undefined);
-    setAccessToken(undefined);
-  };
-
-  const login = (grant?: HerreGrant, endpoint?: HerreEndpoint) => {
-    console.log("Logging in");
-    localStorage.setItem("herre-code", "");
-
-    let used_grant = grant;
-    let used_endpoint = endpoint;
-
-    if (grant) {
-      storeGrant(grant);
-      used_grant = grant;
-    } else {
-      used_grant = getStoredGrant();
-    }
-
-    if (endpoint) {
-      storeEndpoint(endpoint);
-      used_endpoint = endpoint;
-    } else {
-      used_endpoint = getStoredEndpoint();
-    }
-
-    //service?.login();
-
-    const pkce = createPKCECodes();
-    localStorage.setItem("pkce", JSON.stringify(pkce));
-    localStorage.setItem("preAuthUri", location.pathname);
-
+  const prepareCodeRequest = async (
+    grant: HerreGrant,
+    endpoint: HerreEndpoint
+  ) => {
+    const pkce = await codeProvider();
     const codeChallenge = pkce.codeChallenge;
 
     const query = {
-      clientId: used_grant.clientId.trim(),
-      scopes: used_grant.scopes.join(" "),
+      clientId: grant.clientId.trim(),
+      scopes: grant.scopes.join(" "),
       responseType: "code",
-      redirectUri: used_grant.redirectUri,
+      redirectUri: grant.redirectUri,
       codeChallenge,
       codeChallengeMethod: "S256",
     };
     // Responds with a 302 redirect
-    const url = `${
-      used_endpoint.authUrl || used_endpoint.base_url || "/token"
+    const authUri = `${
+      endpoint.authUrl || endpoint.base_url || "/token"
     }?${toUrlEncoded(query)}`;
-    if (doRedirect != undefined) {
-      doRedirect(url);
-    } else {
-      window.open(url, "_blank", "noreferrer, popup");
-    }
+    return { authUri, pkce };
+  };
 
-    setIsAuthenticating(true);
-    const loginFuture = new CancelablePromise(
-      async (resolve, reject, onCancel) => {
-        let count = 0;
+  const login = (grant: HerreGrant, endpoint: HerreEndpoint) => {
+    const loginFuture = new CancelablePromise((resolve, reject, onCancel) => {
+      let abortController = new AbortController();
 
-        const interval = setInterval(async () => {
-          console.log("Checking for code change");
-          const code = localStorage.getItem("herre-code");
-          if (count > 10) {
-            console.log("Code not changed, cancelling");
-            setIsAuthenticating(false);
-            clearInterval(interval);
-            reject("Code not changed");
-            return;
-          }
-
-          if (code && code.length > 0) {
-            count += 1;
-            console.log("Retrieved code", code);
-            setIsAuthenticating(false);
-            clearInterval(interval);
-            localStorage.removeItem("herre-code");
-
-            try {
-              let endpoint = getStoredEndpoint();
-              let grant = getStoredGrant();
-
-              console.log("Code changed, challenging server");
-              fetchToken(grant, endpoint, code).then((token) => {
-                localStorage.setItem("auth", token);
-
-                resolve(token);
-                setStagingToken(token.access_token);
-                setRefreshToken(token.refresh_token);
-                return;
-              });
-            } catch (e) {
-              reject(e);
-              return;
+      prepareCodeRequest(grant, endpoint).then(({ pkce, authUri }) =>
+        doRedirect(authUri, abortController)
+          .then((code) => {
+            if (code) {
+              console.log("Code", code);
+              challengeCode(endpoint, grant, pkce, code)
+                .then((token) => {
+                  fetchUserWithToken(endpoint, token).then((user) => {
+                    setLoginState({
+                      user: user,
+                      auth: token,
+                      endpoint: endpoint,
+                      grant: grant,
+                    });
+                    resolve(token);
+                  });
+                })
+                .catch((e) => {
+                  reject(e);
+                });
+            } else {
+              reject("No redirect");
             }
-          }
-        }, 500);
+          })
+          .catch((e) => {
+            reject(e);
+          })
+      );
 
-        onCancel(() => {
-          setIsAuthenticating(false);
-          console.log("Cancelling login");
-          clearInterval(interval);
-        });
-      }
-    );
-    setLoginFuture(loginFuture);
+      onCancel(() => {
+        console.log("Cancelling login");
+        abortController.abort();
+      });
+    });
 
     return loginFuture;
   };
-
   return (
     <HerreContext.Provider
       value={{
         logout: logout,
         login: login,
-        setCode: setCode,
-        user: user,
-        token: access_token,
-        isAuthenticating,
+        refresh: refresh,
+        user: loginState?.user,
+        token: loginState?.auth?.access_token,
       }}
     >
       {children}
