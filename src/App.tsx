@@ -1,27 +1,29 @@
-import { useState } from "react";
-import "./App.css";
-import { FaktsProvider, FaktsGuard, useFakts } from "fakts";
-import { HerreProvider } from "./herre/HerreProvider";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { useHerre } from "./herre/HerreContext";
-import { Callback } from "./contrib/Callback";
-import { NoFakts } from "./NoFakts";
 import CancelablePromise from "cancelable-promise";
+import { useFakts } from "fakts";
+import { useState } from "react";
+import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import "./App.css";
+import { Callback } from "./contrib/Callback";
+import { useHerre } from "./herre/HerreContext";
+import { HerreProvider } from "./herre/HerreProvider";
 
 export const Test = () => {
-  const { login, logout, user, isAuthenticating } = useHerre();
+  const { login, logout, token, refresh } = useHerre();
   const { fakts } = useFakts();
   const [loginFuture, setLoginFuture] = useState<
     CancelablePromise<void> | undefined
   >();
 
-  const base_url = "http://localhost:8000/o";
+  const base_url = "https://lok-sibarita.iins.u-bordeaux.fr/o";
   console.log(loginFuture);
 
   return (
     <>
-      {user ? (
-        <button onClick={() => logout()}>Logout {user.sub}</button>
+      {token ? (
+        <>
+          <button onClick={() => logout()}>Logout</button>
+          <button onClick={() => refresh()}>Refresh</button>
+        </>
       ) : (
         <>
           {loginFuture ? (
@@ -32,7 +34,7 @@ export const Test = () => {
               }}
             >
               {" "}
-              Cancell{" "}
+              Cancel Login{" "}
             </button>
           ) : (
             <button
@@ -40,9 +42,11 @@ export const Test = () => {
                 setLoginFuture(
                   login(
                     {
-                      clientId: "mylittlefakts",
-                      clientSecret: "mylittlefaktssecret",
-                      scopes: ["read", "write"],
+                      clientId:
+                        "soinfosienfsfosefghsegfsefsdfgeisnefoisneofinsef",
+                      clientSecret:
+                        "soinfoefsefssdfienfoisnefsefsefoisneofinsef",
+                      scopes: ["read"],
                       redirectUri: window.location.origin + "/callback",
                     },
                     {
@@ -51,13 +55,18 @@ export const Test = () => {
                       userInfoEndpoint: base_url + "/userinfo/",
                       authUrl: base_url + "/authorize/",
                     }
-                  ).then(() => {
-                    setLoginFuture(undefined);
-                  })
+                  )
+                    .then(() => {
+                      setLoginFuture(undefined);
+                    })
+                    .catch((e) => {
+                      alert(e.message);
+                      setLoginFuture(undefined);
+                    })
                 )
               }
             >
-              {isAuthenticating ? "Logging in..." : "Login"}
+              {"Login"}
             </button>
           )}
         </>

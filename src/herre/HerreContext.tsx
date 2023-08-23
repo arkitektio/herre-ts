@@ -8,10 +8,9 @@ export type HerreContextType = {
     grant: HerreGrant,
     endpoint: HerreEndpoint
   ) => CancelablePromise<void>;
-  setCode: (code: string) => void;
+  refresh: () => Promise<void>;
   token?: Token;
   user?: HerreUser;
-  isAuthenticating: boolean;
 };
 
 export const HerreContext = React.createContext<HerreContextType>({
@@ -20,8 +19,7 @@ export const HerreContext = React.createContext<HerreContextType>({
     new CancelablePromise((resolve, reject) => {
       reject("Not Herre Provider in context");
     }),
-  setCode: () => {},
-  isAuthenticating: false,
+  refresh: () => new Promise((resolve, reject) => reject()),
 });
 
 export const useHerre = () => useContext(HerreContext);

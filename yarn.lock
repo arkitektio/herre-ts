@@ -464,6 +464,11 @@
   dependencies:
     "@types/node" "*"
 
+"@types/crypto-js@^4.1.1":
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/@types/crypto-js/-/crypto-js-4.1.1.tgz#602859584cecc91894eb23a4892f38cfa927890d"
+  integrity sha512-BG7fQKZ689HIoc5h+6D2Dgq1fABRa0RbBWKBd9SP/MVRVXROflpm5fhwyATX5duFmbStzyzyycPB8qUYKDH3NA==
+
 "@types/form-data@0.0.33":
   version "0.0.33"
   resolved "https://registry.yarnpkg.com/@types/form-data/-/form-data-0.0.33.tgz#c9ac85b2a5fd18435b8c85d9ecb50e6d6c893ff8"
@@ -647,11 +652,6 @@ cancelable-promise@^4.3.1:
   version "4.3.1"
   resolved "https://registry.yarnpkg.com/cancelable-promise/-/cancelable-promise-4.3.1.tgz#957b62382435e74dfb2a038517f53205e0c631c6"
   integrity sha512-A/8PwLk/T7IJDfUdQ68NR24QHa8rIlnN/stiJEBo6dmVUkD4K14LswG0w3VwdeK/o7qOwRUR1k2MhK5Rpy2m7A==
-
-cancellablepromise@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/cancellablepromise/-/cancellablepromise-1.0.1.tgz#d37c075d4a1ebb771e2258e53dd2d4c617b93b44"
-  integrity sha512-dm1MYUCuwWIbO/Vu8URnQNvhEYNkaW45iJOCZ6qYSb5vUEW3fRXozkk2gpEpZX0E+5G26UkkESd9Ab8KE5zMIA==
 
 caniuse-lite@^1.0.30001400:
   version "1.0.30001414"
