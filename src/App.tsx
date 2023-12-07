@@ -6,6 +6,11 @@ import "./App.css";
 import { Callback } from "./contrib/Callback";
 import { useHerre } from "./herre/HerreContext";
 import { HerreProvider } from "./herre/HerreProvider";
+import { FaktsGuard, FaktsProvider, WellKnownDiscovery } from "@jhnnsrs/fakts";
+import { ConnectButtons } from "./contrib/ConnectButton";
+import { LoginButton } from "./contrib/LoginButton";
+import { HerreGuard } from "./herre";
+import { LogoutButton } from "./contrib/LogoutButton";
 
 export const Test = () => {
   const { login, logout, token, refresh } = useHerre();
@@ -19,58 +24,9 @@ export const Test = () => {
 
   return (
     <>
-      {token ? (
-        <>
-          <button onClick={() => logout()}>Logout</button>
-          <button onClick={() => refresh()}>Refresh</button>
-        </>
-      ) : (
-        <>
-          {loginFuture ? (
-            <button
-              onClick={() => {
-                loginFuture.cancel();
-                setLoginFuture(undefined);
-              }}
-            >
-              {" "}
-              Cancel Login{" "}
-            </button>
-          ) : (
-            <button
-              onClick={() =>
-                setLoginFuture(
-                  login(
-                    {
-                      clientId:
-                        "soinfosienfsfosefghsegfsefsdfgeisnefoisneofinsef",
-                      clientSecret:
-                        "soinfoefsefssdfienfoisnefsefsefoisneofinsef",
-                      scopes: ["read"],
-                      redirectUri: window.location.origin + "/callback",
-                    },
-                    {
-                      base_url: base_url,
-                      tokenUrl: base_url + "/token/",
-                      userInfoEndpoint: base_url + "/userinfo/",
-                      authUrl: base_url + "/authorize/",
-                    }
-                  )
-                    .then(() => {
-                      setLoginFuture(undefined);
-                    })
-                    .catch((e) => {
-                      alert(e.message);
-                      setLoginFuture(undefined);
-                    })
-                )
-              }
-            >
-              {"Login"}
-            </button>
-          )}
-        </>
-      )}
+      <HerreGuard fallback={<LoginButton />}>
+        <LogoutButton />
+      </HerreGuard>
     </>
   );
 };
@@ -80,15 +36,19 @@ function App() {
 
   return (
     <div className="App">
-      {" "}
-      <HerreProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Test />} />
-            <Route path="/callback" element={<Callback />} />
-          </Routes>
-        </Router>
-      </HerreProvider>
+      <FaktsProvider>
+        <WellKnownDiscovery endpoints={["localhost:8000"]} />
+        <FaktsGuard fallback={<ConnectButtons />}>
+          <HerreProvider>
+            <Router>
+              <Routes>
+                <Route path="/" element={<Test />} />
+                <Route path="/callback" element={<Callback />} />
+              </Routes>
+            </Router>
+          </HerreProvider>
+        </FaktsGuard>
+      </FaktsProvider>
     </div>
   );
 }
