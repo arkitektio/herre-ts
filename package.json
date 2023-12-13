@@ -1,6 +1,6 @@
 {
   "name": "@jhnnsrs/herre",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
@@ -12,12 +12,14 @@
   "files": [
     "dist"
   ],
-  "module": "./dist/herre.mjs",
+  "type": "module",
+  "main": "./dist/herre.umd.cjs",
+  "module": "./dist/herre.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/herre.mjs",
-      "require": "./dist/herre.umd.js"
+      "import": "./dist/herre.js",
+      "require": "./dist/herre.umd.cjs"
     }
   },
   "dependencies": {
@@ -39,8 +41,8 @@
     "react-router": "^6.4.1",
     "react-router-dom": "^6.4.1",
     "typescript": "^4.6.4",
-    "vite": "^3.1.0",
-    "vite-plugin-dts": "^1.6.3",
+    "vite": "4.1.0",
+    "vite-plugin-dts": "^1.7.3",
     "vitest": "^0.23.4"
   },
   "peerDependencies": {
