@@ -8,21 +8,20 @@ export default defineConfig({
 
   server: {
     port: 7890,
-    strictPort: true,
+    strictPort: false,
   },
   build: {
     lib: {
       entry: "src/herre/index.tsx",
       name: "herre",
-      formats: ["es"],
+      fileName: "herre"
     },
     rollupOptions: {
-      external: ["react", "react-dom", "cancelable-promise", "crypto-js"],
+      external: ["react", "react-dom", "crypto-js"],
       output: {
         globals: {
           react: "React",
           "react-dom": "ReactDOM",
-          "cancelable-promise": "CancelablePromise",
           "crypto-js": "CryptoJS",
         },
       },

@@ -1,4 +1,4 @@
-import { FaktsEndpoint, useFakts } from "@jhnnsrs/fakts";
+import { FaktsEndpoint, useFakts, useLoadFakts } from "@jhnnsrs/fakts";
 import { manifest } from "../manifest";
 
 const defaultButtonClassName =
@@ -17,11 +17,14 @@ export type ConnectButtonsProps = {
 export const ConnectButtons = ({
   containerClassName = defaultContainerClassName,
   onError = (e) => alert(e.message),
-  buttonClassName = (e) => defaultButtonClassName,
   buttonLabel = (e) => `Connect to ${e.name}`,
   noEndpointsFallback = "No endpoints available",
 }: ConnectButtonsProps) => {
-  const { load, registeredEndpoints } = useFakts();
+  const { registeredEndpoints} = useFakts();
+  const { ongoing, load, loading } = useLoadFakts({
+    manifest,
+    requestedRedirectURIs: [window.location.origin + "/callback"],
+  });
 
   return (
     <div className={containerClassName}>
@@ -34,13 +37,9 @@ export const ConnectButtons = ({
                 load({
                   endpoint: e,
                   manifest,
-                }).catch((e) => {
-                  onError(e);
-                })
-              }
-              className={buttonClassName(e)}
+              })}
             >
-              {buttonLabel(e)}
+              {buttonLabel(e)} {loading && "(Connecting)"}
             </button>
           ))
         : noEndpointsFallback}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { HerreContext } from "./HerreContext";
+import { HerreContext, LoginRequest } from "./HerreContext";
 import {
   HerreEndpoint,
   HerreGrant,
@@ -12,7 +12,6 @@ import {
   PKCECodePair,
   toUrlEncoded,
 } from "./BrowserChallenger";
-import { CancelablePromise } from "cancelable-promise";
 export type WrappedHerreProps = {
   children?: React.ReactNode;
 };
@@ -252,9 +251,10 @@ export const HerreProvider = ({
     return token as Auth;
   };
 
-  const prepareCodeRequest = async (
-    grant: HerreGrant,
-    endpoint: HerreEndpoint
+  const prepareCodeRequest = async ({
+    grant,
+    endpoint
+  }: LoginRequest
   ) => {
     const pkce = await codeProvider();
     const codeChallenge = pkce.codeChallenge;
@@ -274,46 +274,48 @@ export const HerreProvider = ({
     return { authUri, pkce };
   };
 
-  const login = (grant: HerreGrant, endpoint: HerreEndpoint) => {
-    const loginFuture = new CancelablePromise((resolve, reject, onCancel) => {
-      let abortController = new AbortController();
+  const login = (request: LoginRequest) => {
 
-      prepareCodeRequest(grant, endpoint).then(({ pkce, authUri }) =>
-        doRedirect(authUri, abortController)
-          .then((code) => {
-            if (code) {
-              console.log("Code", code);
-              challengeCode(endpoint, grant, pkce, code)
-                .then((token) => {
-                  fetchUserWithToken(endpoint, token).then((user) => {
-                    setLoginState({
-                      user: user,
-                      auth: token,
-                      endpoint: endpoint,
-                      grant: grant,
-                    });
-                    resolve(token);
-                  });
-                })
-                .catch((e) => {
-                  reject(e);
-                });
-            } else {
-              reject("No redirect");
-            }
-          })
-          .catch((e) => {
-            reject(e);
-          })
-      );
+    let abortController = new AbortController();
 
-      onCancel(() => {
-        console.log("Cancelling login");
-        abortController.abort();
-      });
+    let result = new Promise<Token>(async (resolve, reject) => {
+      try {
+
+        let answer = await prepareCodeRequest(request)
+        let {pkce, authUri} = answer
+
+        let retrievedCode = await doRedirect(authUri, abortController)
+
+        if (!retrievedCode) {
+          throw new Error("No code retrieved")
+        }
+
+        let token = await challengeCode(request.endpoint, request.grant, pkce, retrievedCode)
+
+        let user = await fetchUserWithToken(request.endpoint, token)
+
+        setLoginState({
+          user: user,
+          auth: token,
+          endpoint: request.endpoint,
+          grant: request.grant,
+        });
+
+        resolve(token.access_token);
+      } catch (e) {
+        reject(e);
+
+        console.error("oauth error", e);
+      }
     });
 
-    return loginFuture;
+    return {
+      cancel: () => {
+        abortController.abort();
+      },
+      promise: result,
+    };
+
   };
   return (
     <HerreContext.Provider

@@ -1,4 +1,5 @@
 export const manifest = {
-  version: "latest",
+  version: "0.5.6",
   identifier: "github.io.jhnnsrs.orkestrator",
+  scopes: ["openid", "profile", "email"],
 };

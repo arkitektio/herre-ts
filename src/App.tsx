@@ -1,4 +1,3 @@
-import CancelablePromise from "cancelable-promise";
 import { useFakts } from "fakts";
 import { useState } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
@@ -6,24 +5,28 @@ import "./App.css";
 import { Callback } from "./contrib/Callback";
 import { useHerre } from "./herre/HerreContext";
 import { HerreProvider } from "./herre/HerreProvider";
-import { FaktsGuard, FaktsProvider, WellKnownDiscovery } from "@jhnnsrs/fakts";
+import { FaktsGuard, FaktsProvider, WellKnownDiscovery, useLoadFakts } from "@jhnnsrs/fakts";
 import { ConnectButtons } from "./contrib/ConnectButton";
 import { LoginButton } from "./contrib/LoginButton";
 import { HerreGuard } from "./herre";
 import { LogoutButton } from "./contrib/LogoutButton";
+import { manifest } from "./manifest";
 
 export const Test = () => {
   const { login, logout, token, refresh } = useHerre();
-  const { fakts } = useFakts();
-  const [loginFuture, setLoginFuture] = useState<
-    CancelablePromise<void> | undefined
-  >();
-
-  const base_url = "https://lok-sibarita.iins.u-bordeaux.fr/o";
-  console.log(loginFuture);
+  const { fakts, load, remove } = useLoadFakts({
+    onProgress: (progress) => {
+      console.log("Progress", progress);
+    },
+    manifest: manifest
+  });
+;
 
   return (
     <>
+    {JSON.stringify(fakts)}
+      <button onClick={() => load()}>Load</button>
+      <button onClick={() => remove()}>Remove</button>
       <HerreGuard fallback={<LoginButton />}>
         <LogoutButton />
       </HerreGuard>
@@ -37,7 +40,7 @@ function App() {
   return (
     <div className="App">
       <FaktsProvider>
-        <WellKnownDiscovery endpoints={["localhost:8000"]} />
+        <WellKnownDiscovery endpoints={["localhost:8010"]} />
         <FaktsGuard fallback={<ConnectButtons />}>
           <HerreProvider>
             <Router>

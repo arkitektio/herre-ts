@@ -1,24 +1,33 @@
-import CancelablePromise from "cancelable-promise";
 import React, { useContext } from "react";
 import { HerreUser, Token, HerreEndpoint, HerreGrant } from "./types";
 
 export type HerreContextType = {
   logout: () => void;
-  login: (
-    grant: HerreGrant,
-    endpoint: HerreEndpoint
-  ) => CancelablePromise<void>;
-  refresh: () => Promise<void>;
+  login: (request: LoginRequest) => CancelableRequest<Token>;
+  refresh: () => Promise<Token>;
   token?: Token;
   user?: HerreUser;
 };
 
+
+export type CancelableRequest<T> = {
+  cancel: () => void;
+  promise: Promise<T>;
+}
+
+
+export type LoginRequest = {
+  grant: HerreGrant;
+  endpoint: HerreEndpoint;
+  onProgress?: (progress: string) => void;
+};
+
+
 export const HerreContext = React.createContext<HerreContextType>({
   logout: () => {},
-  login: () =>
-    new CancelablePromise((resolve, reject) => {
-      reject("Not Herre Provider in context");
-    }),
+  login: () => {
+    return {promise: Promise.reject(Error("No FaktsProvider found")), cancel: () => {}};
+  },
   refresh: () => new Promise((resolve, reject) => reject()),
 });
 
