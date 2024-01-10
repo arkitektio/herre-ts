@@ -6,9 +6,9 @@ export const HerreGuard: React.FC<{
   fallback?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ key, children, fallback }) => {
-  const { user } = useHerre();
+  const { token } = useHerre();
 
-  if (user) return <>{children}</>;
+  if (token) return <>{children}</>;
 
   return <>{fallback || `No user login`}</>;
 };

@@ -303,9 +303,11 @@ export const HerreProvider = ({
 
         resolve(token.access_token);
       } catch (e) {
-        reject(e);
+        setLoginState(undefined);
 
         console.error("oauth error", e);
+
+        reject(e);
       }
     });
 
