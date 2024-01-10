@@ -1,10 +1,10 @@
 {
   "name": "@jhnnsrs/herre",
-  "version": "0.0.14",
+  "version": "0.0.16",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
     "p": "yarn publish --access public"
@@ -23,11 +23,10 @@
     }
   },
   "dependencies": {
-    "cancelable-promise": "^4.3.1",
     "crypto-js": "^4.1.1"
   },
   "devDependencies": {
-    "@jhnnsrs/fakts": "^0.0.17",
+    "@jhnnsrs/fakts": "^0.0.23",
     "@testing-library/react": "^13.4.0",
     "@types/crypto-js": "^4.1.1",
     "@types/react": "^18.0.17",
