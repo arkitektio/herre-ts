@@ -3,7 +3,7 @@ import { CancelableRequest, LoginRequest, useHerre } from "../HerreContext";
 import { Token } from "../types";
 
 export const useLogin = () => {
-  const { token, login: herreLogin, logout: herreLogout } = useHerre();
+  const { token, login: herreLogin, logout: herreLogout, user } = useHerre();
 
   const [progress, setProgress] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -58,5 +58,6 @@ export const useLogin = () => {
     logout,
     error,
     token,
+    user,
   };
 };
